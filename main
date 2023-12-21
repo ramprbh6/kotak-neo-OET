@@ -1,0 +1,900 @@
+import asyncio
+import threading
+from PyQt5 import QtWidgets
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtWidgets import (QMainWindow, QComboBox, QApplication, QWidget,
+                             QLabel, QPushButton, QCheckBox)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import *
+from PyQt6.QtCore import *
+import sys
+from threading import Thread
+import aiohttp
+from neo_api_client import NeoAPI
+import sys
+import pandas
+from openpyxl import load_workbook
+import json
+import http.client
+import ssl
+import base64
+import ast
+import datetime;
+import nest_asyncio
+import cProfile
+import pstats
+nest_asyncio.apply()
+ 
+
+
+
+class AnotherWindow(QMainWindow):
+    def __init__(self):
+        QMainWindow.__init__(self)
+        QWidget.__init__(self)
+        self.resize(600, 400)
+        self.setWindowTitle("Kotak NEO Client by Ram")
+        self.uicomponents()
+        self.show()
+        nest_asyncio.apply()
+
+    def uicomponents(self):
+        self.label_1 = QLabel('Available Margin', self)
+        self.label_1.move(190, 60)
+        self.label_1.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_1.adjustSize()
+        btn1 = QPushButton('Balance', self)
+        btn1.resize(120, 32)
+        btn1.move(50, 50)
+        btn1.clicked.connect(self.marg)
+        self.combo_box = QComboBox(self)
+        self.combo_box.setGeometry(50, 100, 120, 40)
+        self.combo_box.addItems(['Nifty', 'BankNifty', 'FinNifty', 'MidCap', 'Sensex'])
+        self.selectcallbutton = QPushButton('Call', self)
+        self.selectcallbutton.setGeometry(50, 180, 80, 32)
+        self.selectcallbutton.clicked.connect(self.call)
+        self.selectputbutton = QPushButton('Put', self)
+        self.selectputbutton.setGeometry(150, 180, 80, 32)
+        self.selectputbutton.clicked.connect(self.put)
+        self.expsavebutton = QPushButton('Save Exp', self)
+        self.expsavebutton.setGeometry(350, 285, 80, 32)
+        self.expsavebutton.clicked.connect(self.expsave)
+        self.label_2 = QLabel('Nifty', self)
+        self.label_2.move(350, 50)
+        self.label_2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_2.adjustSize()
+        self.label_3 = QLabel('Bank-Nifty', self)
+        self.label_3.move(350, 100)
+        self.label_3.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_3.adjustSize()
+        self.label_4 = QLabel('Fin-Nifty', self)
+        self.label_4.move(350, 150)
+        self.label_4.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_4.adjustSize()
+        self.label_5 = QLabel('MidCap-Nifty', self)
+        self.label_5.move(350, 200)
+        self.label_5.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_5.adjustSize()
+        self.label_6 = QLabel('Sensex', self)
+        self.label_6.move(350, 250)
+        self.label_6.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_6.adjustSize()
+        df = pandas.read_excel('kotakneoapiexpiry.xlsx', engine='openpyxl')
+        self.rowlen = len(df.Exp)
+        self.child = []
+        self.niftyexpry = QtWidgets.QLineEdit(self)
+        self.niftyexpry.setGeometry(QtCore.QRect(440, 45, 150, 30))
+        # self.niftyexpry.setText("NIFTY23")
+        self.bankniftyexpry = QtWidgets.QLineEdit(self)
+        self.bankniftyexpry.setGeometry(QtCore.QRect(440, 95, 150, 30))
+        # self.bankniftyexpry.setText("BANKNIFTY23")
+        self.finniftyexpry = QtWidgets.QLineEdit(self)
+        self.finniftyexpry.setGeometry(QtCore.QRect(440, 145, 150, 30))
+        # self.finniftyexpry.setText("FINNIFTY23")
+        self.midcapniftyexpry = QtWidgets.QLineEdit(self)
+        self.midcapniftyexpry.setGeometry(QtCore.QRect(440, 195, 150, 30))
+        # self.midcapniftyexpry.setText("MIDCPNIFTY23")
+        self.sensexexpry = QtWidgets.QLineEdit(self)
+        self.sensexexpry.setGeometry(QtCore.QRect(440, 245, 150, 30))
+        # self.sensexexpry.setText("SENSEX23")
+        for i in range(len(df.Exp)):
+            if i == 0:
+                self.niftyexpry.setText(df.Exp[i])
+            if i == 1:
+                self.bankniftyexpry.setText(df.Exp[i])
+            if i == 2:
+                self.finniftyexpry.setText(df.Exp[i])
+            if i == 3:
+                self.midcapniftyexpry.setText(df.Exp[i])
+            if i == 4:
+                self.sensexexpry.setText(df.Exp[i])
+
+    def call(self):
+        self.instrumentchange('CE')
+
+    def put(self):
+        self.instrumentchange('PE')
+
+    def expsave(self):
+        wb = load_workbook('kotakneoapiexpiry.xlsx')
+        sheet = wb.active
+        for i in range(self.rowlen):
+            if i == 0:
+                sheet.cell(row=2, column=2).value = self.niftyexpry.text()
+            if i == 1:
+                sheet.cell(row=3, column=2).value = self.bankniftyexpry.text()
+            if i == 2:
+                sheet.cell(row=4, column=2).value = self.finniftyexpry.text()
+            if i == 3:
+                sheet.cell(row=5, column=2).value = self.midcapniftyexpry.text()
+            if i == 4:
+                sheet.cell(row=6, column=2).value = self.sensexexpry.text()
+        wb.save('kotakneoapiexpiry.xlsx')
+
+    def instrumentchange(self, callorput):
+        if self.combo_box.currentIndex() == 0:
+            self.scrip = self.niftyexpry.text()
+            self.lot = 50
+            self.qty = 1800
+            self.i = test(self.lot, self.qty, self.scrip,
+                          callorput, 'NFO')
+            self.i.show()
+            self.child.append(self.i)
+        elif self.combo_box.currentIndex() == 2:
+            print("Finifty is selected")
+            self.scrip = self.finniftyexpry.text()
+            self.lot = 40
+            self.qty = 1800
+            self.i = test(self.lot, self.qty, self.scrip,
+                          callorput, 'NFO')
+            self.i.show()
+            self.child.append(self.i)
+        elif self.combo_box.currentIndex() == 1:
+            self.scrip = self.bankniftyexpry.text()
+            self.lot = 15
+            self.qty = 900
+            self.i = test(self.lot, self.qty, self.scrip,
+                          callorput, 'NFO')
+            self.i.show()
+            self.child.append(self.i)
+        elif self.combo_box.currentText() == 'MidCap':
+            self.scrip = self.midcapniftyexpry.text()
+            self.lot = 75
+            self.qty = 4200
+            self.i = test(self.lot, self.qty, self.scrip,
+                          callorput, 'NFO')
+            self.i.show()
+            self.child.append(self.i)
+        elif self.combo_box.currentText() == 'Sensex':
+            self.scrip = self.sensexexpry.text()
+            self.lot = 10
+            self.qty = 1000
+            self.i = test(self.lot, self.qty, self.scrip,
+                          callorput, 'BFO')
+            self.i.show()
+            self.child.append(self.i)
+
+    def marg(self):
+        conn = http.client.HTTPSConnection("gw-napi.kotaksecurities.com")
+        payload = 'jData=%7B%22seg%22%3A%22ALL%22%2C%22exch%22%3A%22ALL%22%2C%22prod%22%3A%22ALL%22%7D'
+        headers = {
+            'accept': 'application/json',
+            'Sid': sid,
+            'Auth': tok1,
+            'neo-fin-key': 'neotradeapi',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': accesstoken
+        }
+        conn.request("POST", "/Orders/2.0/quick/user/limits?sId=server5", payload, headers)
+        res = conn.getresponse()
+        response = res.read()
+        decoded = response.decode("utf-8")
+        data = ast.literal_eval(decoded)
+        print(repr(data["Net"]))
+        self.label_1.setText(str(float(data["Net"])))
+
+
+class test(QMainWindow):
+
+    def __init__(self, perlot, maxqty, expry, cp, exchng):
+        QMainWindow.__init__(self)
+        QWidget.__init__(self)
+        self.resize(630, 330)
+        self.setWindowTitle("Trade Window " + expry + "  " + cp)
+        self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint)
+
+        self.uicomponents2()
+
+        self.mxqty = maxqty
+        self.perlt = perlot
+        self.exp = expry
+        self.cp = cp
+        self.exchng = exchng
+        print(perlot)
+        print(maxqty)
+        print(expry)
+        print(cp)
+        print(exchng)
+
+    def uicomponents2(self):
+
+        self.buylabel_4 = QLabel('Strike', self)
+        self.buylabel_4.move(85, 160)
+        self.buylabel_4.adjustSize()
+        self.buylabel_5 = QLabel('Price', self)
+        self.buylabel_5.move(85, 215)
+        self.buylabel_5.adjustSize()
+        self.buylabel_5.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.buystrikeprice = QtWidgets.QLineEdit(self)
+        self.buystrikeprice.setGeometry(QtCore.QRect(150, 160, 75, 30))
+        self.buydoubleSpinBox = QtWidgets.QDoubleSpinBox(self)
+        self.buydoubleSpinBox.setGeometry(QtCore.QRect(150, 210, 75, 30))
+        self.buydoubleSpinBox.setObjectName("doubleSpinBox")
+        self.buydoubleSpinBox.setRange(0.00, 800.00)
+        # self.buydoubleSpinBox.setSingleStep(0.10)
+        buybtn2 = QPushButton('New-Buy', self)
+        buybtn2.resize(50, 32)
+        buybtn2.move(135, 250)
+        buybtn2.setStyleSheet("background-color : green")
+        buybtn2.clicked.connect(self.freshbuy)
+        continuebuybtn2 = QPushButton('Cont-Buy', self)
+        continuebuybtn2.resize(50, 32)
+        continuebuybtn2.move(185, 250)
+        continuebuybtn2.setStyleSheet("background-color : green")
+        continuebuybtn2.clicked.connect(self.placingbuyorder)
+        self.slp = QtWidgets.QDoubleSpinBox(self)
+        self.slp.setGeometry(QtCore.QRect(270, 180, 75, 30))
+        self.slp.setObjectName("doubleSpinBox")
+        self.slp.setRange(0.00, 800.00)
+        self.slp.setValue(5)
+        
+        self.stoplosschckbox = QCheckBox("Stoploss", self)
+        self.stoplosschckbox.move(10, 130)
+        self.stoplosschckbox.setChecked(True)
+        self.avlbal = QtWidgets.QDoubleSpinBox(self)
+        self.avlbal.setGeometry(QtCore.QRect(150, 20, 220, 30))
+        self.avlbal.setMaximum(99999999)
+        self.avlbal.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.avlbal.adjustSize()
+        self.label_2 = QLabel('Qty', self)
+        self.label_2.move(400, 100)
+        self.label_2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_2.adjustSize()
+        self.label_21 = QLabel('Orders Placed', self)
+        self.label_21.move(400, 70)
+        self.label_21.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_21.adjustSize()
+        
+        self.label_4 = QLabel('Strike', self)
+        self.label_4.move(400, 160)
+        self.label_4.adjustSize()
+        self.label_4.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        trlstplsbtn1 = QPushButton('strt', self)
+        trlstplsbtn1.resize(50, 32)
+        trlstplsbtn1.move(350, 150)
+        trlstplsbtn1.setStyleSheet("background-color : green")
+
+        trlstplsbtn2 = QPushButton('stop', self)
+        trlstplsbtn2.resize(50, 32)
+        trlstplsbtn2.move(400, 150)
+        trlstplsbtn2.setStyleSheet("background-color : green")
+
+        self.label_5 = QLabel('Price', self)
+        self.label_5.move(400, 215)
+        self.label_5.adjustSize()
+        self.label_5.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.ordrplcd = QtWidgets.QLineEdit(self)
+        self.ordrplcd.setGeometry(QtCore.QRect(500, 70, 75, 30))
+        self.qty2sell = QtWidgets.QLineEdit(self)
+        self.qty2sell.setGeometry(QtCore.QRect(500, 100, 75, 30))
+        self.strikeprice = QtWidgets.QLineEdit(self)
+        self.strikeprice.setGeometry(QtCore.QRect(500, 160, 75, 30))
+        self.trlstpls = QtWidgets.QDoubleSpinBox(self)
+        self.trlstpls.setGeometry(QtCore.QRect(270, 150, 75, 30))
+        self.trlstpls.setObjectName("doubleSpinBox")
+        self.trlstpls.setRange(0.00, 800.00)
+        self.doubleSpinBox = QtWidgets.QDoubleSpinBox(self)
+        self.doubleSpinBox.setGeometry(QtCore.QRect(500, 210, 75, 30))
+        self.doubleSpinBox.setObjectName("doubleSpinBox")
+        self.doubleSpinBox.setRange(0.00, 800.00)
+        # self.doubleSpinBox.setSingleStep(0.10)
+        btn2stp = QPushButton('Del Stploss', self)
+        btn2stp.resize(100, 32)
+        btn2stp.move(270, 50)
+        btn2stp.setStyleSheet("background-color : red")
+        # btn2stp.clicked.connect(self.stop) , commented because to create stop button for deleting the stoploss list.
+        btn2stp.clicked.connect(self.deletestoplosslist)
+        btn2 = QPushButton('Sell', self)
+        btn2.resize(100, 30)
+        btn2.move(520, 250)
+        btn2.setStyleSheet("background-color : red")
+        btn2.clicked.connect(self.placingsellorder)
+        btn1 = QPushButton('Balance', self)
+        btn1.resize(100, 32)
+        btn1.move(10, 10)
+        btn1.clicked.connect(self.marg)
+
+        btn4 = QPushButton('Sqr off all', self)
+        btn4.resize(80, 32)
+        btn4.move(500, 10)
+        btn4.setStyleSheet("background-color : red")
+        btn4.clicked.connect(self.sqroff)
+        btn5 = QPushButton('Modify', self)
+        btn5.resize(100, 30)
+        btn5.move(420, 250)
+        btn5.setStyleSheet("background-color : orange")
+        btn5.clicked.connect(self.modify)
+        btncreatestpls = QPushButton('Create Stplos', self)
+        btncreatestpls.resize(100, 30)
+        btncreatestpls.move(320, 250)
+        btncreatestpls.setStyleSheet("background-color : orange")
+        btncreatestpls.clicked.connect(self.createstoploss)
+        modifybtn1 = QPushButton('0.50', self)
+        modifybtn1.resize(30, 30)
+        modifybtn1.move(420, 280)
+        modifybtn1.setStyleSheet("background-color : orange")
+        modifybtn1.clicked.connect(self.modify5)
+        modifybtn2 = QPushButton('0.20', self)
+        modifybtn2.resize(30, 30)
+        modifybtn2.move(460, 280)
+        modifybtn2.setStyleSheet("background-color : orange")
+        modifybtn2.clicked.connect(self.modify2)
+        modifybtn3 = QPushButton('0.10', self)
+        modifybtn3.resize(30, 30)
+        modifybtn3.move(500, 280)
+        modifybtn3.setStyleSheet("background-color : orange")
+        modifybtn3.clicked.connect(self.modify1)
+        modifybtn4 = QPushButton('1.0', self)
+        modifybtn4.resize(30, 30)
+        modifybtn4.move(380, 280)
+        modifybtn4.setStyleSheet("background-color : orange")
+        modifybtn4.clicked.connect(self.modify100)
+        self.marginthruthread()
+        self.slorderidlist = []
+        # ordersplaced=self.clnt.order_report()
+        # print(ordersplaced)
+        # if ordersplaced['stat']=='Ok':
+        #   self.ordrplcd.setText(str(len(ordersplaced['data'])))
+
+    def deletestoplosslist(self):
+        slpresent = len(self.slorderidlist)
+        if slpresent > 0:
+            self.slorderidlist = []
+
+    def createstoploss(self):
+        try:
+            print("Placing stploss orders")
+            quanstr = self.qty2sell.text()
+            p = self.doubleSpinBox.value()
+            pstr = str(p)
+            pris = str(p - 0.5)
+            quan = int(quanstr)
+            nooforder = quan / self.mxqty
+            rmndr = quan % self.mxqty
+            ordernum = int(nooforder)
+            self.trdsmbl = self.exp + self.buystrikeprice.text() + self.cp
+            self.slorderidlist = []
+            self.slorderidlistqty = []
+            self.slthreads = []
+
+            quan = str(self.mxqty)
+            quanrmndr = str(rmndr)
+            price = pris
+            es = 'nse_fo'
+            pc = 'NRML'
+            pt = 'SL'
+            rt = 'DAY'
+            tp = pstr
+            ts = self.trdsmbl
+            tt = 'S'
+            slbuypayld = 'jData=%7B%22am%22%3A%22NO%22%2C%20%22dq%22%3A%220%22%2C%22es%22%3A%22' + es + '%22%2C%20%22mp%22%3A%220%22%2C%20%22pc%22%3A%22' + pc + '%22%2C%20%22pf%22%3A%22N%22%2C%20%22pr%22%3A%22' + price + '%22%2C%20%22pt%22%3A%22' + pt + '%22%2C%20%22qt%22%3A%22' + quan + '%22%2C%20%22rt%22%3A%22' + rt + '%22%2C%20%22tp%22%3A%22' + tp + '%22%2C%20%22ts%22%3A%22' + ts + '%22%2C%20%22tt%22%3A%22' + tt + '%22%7D'
+            slbuypayldrmndr = 'jData=%7B%22am%22%3A%22NO%22%2C%20%22dq%22%3A%220%22%2C%22es%22%3A%22' + es + '%22%2C%20%22mp%22%3A%220%22%2C%20%22pc%22%3A%22' + pc + '%22%2C%20%22pf%22%3A%22N%22%2C%20%22pr%22%3A%22' + price + '%22%2C%20%22pt%22%3A%22' + pt + '%22%2C%20%22qt%22%3A%22' + quanrmndr + '%22%2C%20%22rt%22%3A%22' + rt + '%22%2C%20%22tp%22%3A%22' + tp + '%22%2C%20%22ts%22%3A%22' + ts + '%22%2C%20%22tt%22%3A%22' + tt + '%22%7D'
+            ct = datetime.datetime.now()
+            print("current time:-", ct)
+            for _ in range(ordernum):
+                t = threading.Thread(target=self.stoplossorderplace, args=(slbuypayld, str(self.mxqty)))
+                self.slthreads.append(t)
+                t.start()
+
+            if rmndr > 0:
+                self.stoplossorderplace(slbuypayldrmndr, str(rmndr))
+
+            if ordernum > 0:
+                t.join()
+
+            # self.marginthruthread()
+        except Exception as e:
+            print("The error occured while stoploss orders", e)
+
+    def sqroff(self):
+        sllen = len(self.slorderidlist)
+        self.cancelthreads = []
+        if sllen > 0:
+            for x in range(0, sllen):
+                t = threading.Thread(target=self.ordercancel, args=(self.slorderidlist[x]))
+                self.cancelthreads.append(t)
+                t.start()
+            t.join()
+            print("Stoploss orders got cancelled")
+        else:
+            print("Stoploss order queue is empty")
+
+    def marginthruthread(self):
+        margthrd = Thread(target=self.marg)
+        margthrd.start()
+        margthrd.join()
+
+    def freshbuy(self):
+        self.slorderidlist = []
+        self.slorderidlistqty = []
+        self.placedorders = 0
+        self.placingbuyorder()
+
+    def orderbook(self):
+        conn = http.client.HTTPSConnection("gw-napi.kotaksecurities.com")
+        headers = {
+            'accept': 'application/json',
+            'Sid': sid,
+            'Auth': tok1,
+            'neo-fin-key': 'neotradeapi',
+            'Authorization': accesstoken
+        }
+        payload = ''
+        conn.request("GET", "/Orders/2.0/quick/user/orders?sId=server1", payload, headers)
+        res = conn.getresponse()
+        data = res.read()
+        reports = data.decode("utf-8")
+        data = ast.literal_eval(reports)
+        return data
+
+    def orderplace(self, paylod):
+
+        conn = http.client.HTTPSConnection("gw-napi.kotaksecurities.com")
+        headers = {
+            'accept': 'application/json',
+            'Sid': sid,
+            'Auth': tok1,
+            'neo-fin-key': 'neotradeapi',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': accesstoken
+        }
+        
+        conn.request("POST", "/Orders/2.0/quick/order/rule/ms/place?sId=server1", paylod, headers)
+        conn.getresponse()
+
+    def stoplossorderplace(self, payld, quantity):
+        conn = http.client.HTTPSConnection("gw-napi.kotaksecurities.com")
+        headers = {
+            'accept': 'application/json',
+            'Sid': sid,
+            'Auth': tok1,
+            'neo-fin-key': 'neotradeapi',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': accesstoken
+        }
+        
+        conn.request("POST", "/Orders/2.0/quick/order/rule/ms/place?sId=server1", payld, headers)
+        res = conn.getresponse()
+        slorderplaceddata = res.read()
+        pd = slorderplaceddata.decode("utf-8")
+        slords = ast.literal_eval(pd)
+        self.slorderidlist.append(slords['nOrdNo'])
+        self.slorderidlistqty.append(quantity)
+
+    async def slmodify(self,triggerprice,price,x):
+        
+        
+        headers = {
+            'accept': 'application/json',
+            'Sid': sid,
+            'Auth': tok1,
+            'neo-fin-key': 'neotradeapi',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': accesstoken
+        }
+        
+        payload = 'jData=%7B%22tk%22%3A%22' + self.token + '%22%2C%20%22am%22%3A%22NO%22%2C%20%22mp%22%3A%22' + '0' + '%22%2C%20%22pc%22%3A%22' + 'NRML' + '%22%2C%20%22dd%22%3A%22' + 'NA' + '%22%2C%20%22dq%22%3A%22' + '0' + '%22%2C%20%22vd%22%3A%22' + 'DAY' + '%22%2C%20%22ts%22%3A%22' + self.trdsmbl + '%22%2C%20%22tt%22%3A%22' + 'S' + '%22%2C%20%22pr%22%3A%22' + price + '%22%2C%20%22tp%22%3A%22' + triggerprice + '%22%2C%20%22qt%22%3A%22' + self.slorderidlistqty[x] + '%22%2C%20%22no%22%3A%22' + str(
+            self.slorderidlist[x]) + '%22%2C%20%22es%22%3A%22' + 'nse_fo' + '%22%2C%20%22pt%22%3A%22' + 'SL' + '%22%7D'
+        url="https://gw-napi.kotaksecurities.com/Orders/2.0/quick/order/vr/modify?sId=server1"
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.post(url, data=payload) as response:
+                return await response.text()
+        
+        
+        '''conn = http.client.HTTPSConnection("gw-napi.kotaksecurities.com")
+        headers = {
+            'accept': 'application/json',
+            'Sid': sid,
+            'Auth': tok1,
+            'neo-fin-key': 'neotradeapi',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': accesstoken
+        }
+        
+        payload = 'jData=%7B%22tk%22%3A%22' + self.token + '%22%2C%20%22am%22%3A%22NO%22%2C%20%22mp%22%3A%22' + '0' + '%22%2C%20%22pc%22%3A%22' + 'NRML' + '%22%2C%20%22dd%22%3A%22' + 'NA' + '%22%2C%20%22dq%22%3A%22' + '0' + '%22%2C%20%22vd%22%3A%22' + 'DAY' + '%22%2C%20%22ts%22%3A%22' + self.trdsmbl + '%22%2C%20%22tt%22%3A%22' + 'S' + '%22%2C%20%22pr%22%3A%22' + price + '%22%2C%20%22tp%22%3A%22' + triggerprice + '%22%2C%20%22qt%22%3A%22' + self.slorderidlistqty[x] + '%22%2C%20%22no%22%3A%22' + str(
+            self.slorderidlist[x]) + '%22%2C%20%22es%22%3A%22' + 'nse_fo' + '%22%2C%20%22pt%22%3A%22' + 'SL' + '%22%7D'
+        conn.request("POST", "/Orders/2.0/quick/order/vr/modify?sId=server1", payload, headers)
+        conn.getresponse()'''
+        
+    def ordercancel(self, orderid):
+        conn = http.client.HTTPSConnection("gw-napi.kotaksecurities.com")
+        payload = 'jData=%7B%22on%22%3A%22' + orderid + '%22%7D'
+        headers = {
+            'accept': 'application/json',
+            'Sid': sid,
+            'Auth': tok1,
+            'neo-fin-key': 'neotradeapi',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': accesstoken
+        }
+        conn.request("POST", "/Orders/2.0/quick/order/cancel?sId=server1", payload, headers)
+        conn.getresponse()
+        print("Orders got cancelled")
+        
+    def placingbuyorder(self):
+
+        
+        a = self.avlbal.value()
+        p = self.buydoubleSpinBox.value()
+        pstr = str(p)
+        c = a / p
+        n = int(c)
+        f = n / self.perlt
+        quan = int(f) * self.perlt
+        nooforder = quan / self.mxqty
+        rmndr = quan % self.mxqty
+        ordernum = int(nooforder)
+        fnbstrike = self.buystrikeprice.text()
+
+        self.trdsmbl = self.exp + fnbstrike + self.cp
+        quan = str(self.mxqty)
+        quanrmndr = str(rmndr)
+        price = pstr
+        es = 'nse_fo'
+        pc = 'NRML'
+        pt = 'L'
+        rt = 'IOC'
+        tp = '0'
+        ts = self.trdsmbl
+        tt = 'B'
+        buypayld = 'jData=%7B%22am%22%3A%22NO%22%2C%20%22dq%22%3A%220%22%2C%22es%22%3A%22' + es + '%22%2C%20%22mp%22%3A%220%22%2C%20%22pc%22%3A%22' + pc + '%22%2C%20%22pf%22%3A%22N%22%2C%20%22pr%22%3A%22' + price + '%22%2C%20%22pt%22%3A%22' + pt + '%22%2C%20%22qt%22%3A%22' + quan + '%22%2C%20%22rt%22%3A%22' + rt + '%22%2C%20%22tp%22%3A%22' + tp + '%22%2C%20%22ts%22%3A%22' + ts + '%22%2C%20%22tt%22%3A%22' + tt + '%22%7D'
+        buypayldrmndr = 'jData=%7B%22am%22%3A%22NO%22%2C%20%22dq%22%3A%220%22%2C%22es%22%3A%22' + es + '%22%2C%20%22mp%22%3A%220%22%2C%20%22pc%22%3A%22' + pc + '%22%2C%20%22pf%22%3A%22N%22%2C%20%22pr%22%3A%22' + price + '%22%2C%20%22pt%22%3A%22' + pt + '%22%2C%20%22qt%22%3A%22' + quanrmndr + '%22%2C%20%22rt%22%3A%22' + rt + '%22%2C%20%22tp%22%3A%22' + tp + '%22%2C%20%22ts%22%3A%22' + ts + '%22%2C%20%22tt%22%3A%22' + tt + '%22%7D'
+        threads = []
+        # ct stores current time
+        ct = datetime.datetime.now()
+        print("current time:-", ct)
+        for _ in range(ordernum):
+            t = threading.Thread(target=self.orderplace, args=(buypayld,))
+            threads.append(t)
+            t.start()
+            
+        if rmndr > 0:
+            self.orderplace(buypayldrmndr)
+            ordernum = ordernum + 1
+        for t in threads:
+            t.join()
+        print("orders placed ",ordernum)
+        ordersplaced = self.orderbook()
+        print("Orderbook fetched at ",datetime.datetime.now())
+        self.nooffilledorders = 0
+        totalcost = 0
+        orderlen = len(ordersplaced['data'])
+        self.token = ordersplaced['data'][orderlen-1]['tok']
+        for z in range(orderlen - ordernum, orderlen):
+            if (ordersplaced['data'][z]['fldQty'] > 0):
+                #self.token = ordersplaced['data'][z]['tok']
+                self.nooffilledorders = self.nooffilledorders + int(ordersplaced['data'][z]['fldQty'])
+                self.placedorders = self.nooffilledorders + int(ordersplaced['data'][z]['fldQty'])
+                thiscost = int(ordersplaced['data'][z]['fldQty']) * float(ordersplaced['data'][z]['avgPrc'])
+                totalcost = totalcost + int(thiscost)
+
+        if ((self.nooffilledorders > 1) and (self.stoplosschckbox.isChecked())):
+            # lots num for stoploss
+
+            avgcost = round(totalcost / self.nooffilledorders, 1)
+            print("The avg cost is ", avgcost)
+            lotnoforstploss = int(self.nooffilledorders / self.mxqty)
+            # rmndr lots numf or stoploss
+            rlnfs = self.nooffilledorders % self.mxqty
+            price = str(avgcost - self.slp.value())
+            tp = str(avgcost - self.slp.value() + 1)
+            quanrmndr = str(rlnfs)
+            pt = 'SL'
+            tt = 'S'
+            stplspayload = 'jData=%7B%22am%22%3A%22NO%22%2C%20%22dq%22%3A%220%22%2C%22es%22%3A%22' + es + '%22%2C%20%22mp%22%3A%220%22%2C%20%22pc%22%3A%22' + pc + '%22%2C%20%22pf%22%3A%22N%22%2C%20%22pr%22%3A%22' + price + '%22%2C%20%22pt%22%3A%22' + pt + '%22%2C%20%22qt%22%3A%22' + quan + '%22%2C%20%22rt%22%3A%22' + rt + '%22%2C%20%22tp%22%3A%22' + tp + '%22%2C%20%22ts%22%3A%22' + ts + '%22%2C%20%22tt%22%3A%22' + tt + '%22%7D'
+            stplspayloadrmndr = 'jData=%7B%22am%22%3A%22NO%22%2C%20%22dq%22%3A%220%22%2C%22es%22%3A%22' + es + '%22%2C%20%22mp%22%3A%220%22%2C%20%22pc%22%3A%22' + pc + '%22%2C%20%22pf%22%3A%22N%22%2C%20%22pr%22%3A%22' + price + '%22%2C%20%22pt%22%3A%22' + pt + '%22%2C%20%22qt%22%3A%22' + quanrmndr + '%22%2C%20%22rt%22%3A%22' + rt + '%22%2C%20%22tp%22%3A%22' + tp + '%22%2C%20%22ts%22%3A%22' + ts + '%22%2C%20%22tt%22%3A%22' + tt + '%22%7D'
+
+            self.slthreads = []
+            for _ in range(lotnoforstploss):
+                t = threading.Thread(target=self.stoplossorderplace, args=(stplspayload, quan))
+                self.slthreads.append(t)
+                t.start()
+
+            if rlnfs > 0:
+                self.stoplossorderplace(stplspayloadrmndr, quanrmndr)
+
+            for t in threads:
+                t.join()
+
+        self.qty2sell.setText(str(self.placedorders))
+        self.doubleSpinBox.setValue(p)
+        self.ordrplcd.setText(str(orderlen))
+        # self.marginthruthread()
+
+    def placingsellorder(self):
+        try:
+            print("Placing sell orders")
+            quanstr = self.qty2sell.text()
+            p = self.doubleSpinBox.value()
+            pstr = str(p)
+            quan = int(quanstr)
+            nooforder = quan / self.mxqty
+            rmndr = quan % self.mxqty
+            ordernum = int(nooforder)
+            slpresent = len(self.slorderidlist)
+            if slpresent > 0:
+                self.sqroff()
+
+            quan = str(self.mxqty)
+            quanrmndr = str(rmndr)
+            price = pstr
+            es = 'nse_fo'
+            pc = 'NRML'
+            pt = 'L'
+            rt = 'IOC'
+            tp = '0'
+            ts = self.trdsmbl
+            tt = 'S'
+            pay = 'jData=%7B%22am%22%3A%22NO%22%2C%20%22dq%22%3A%220%22%2C%22es%22%3A%22' + es + '%22%2C%20%22mp%22%3A%220%22%2C%20%22pc%22%3A%22' + pc + '%22%2C%20%22pf%22%3A%22N%22%2C%20%22pr%22%3A%22' + price + '%22%2C%20%22pt%22%3A%22' + pt + '%22%2C%20%22qt%22%3A%22' + quan + '%22%2C%20%22rt%22%3A%22' + rt + '%22%2C%20%22tp%22%3A%22' + tp + '%22%2C%20%22ts%22%3A%22' + ts + '%22%2C%20%22tt%22%3A%22' + tt + '%22%7D'
+            payrmndr = 'jData=%7B%22am%22%3A%22NO%22%2C%20%22dq%22%3A%220%22%2C%22es%22%3A%22' + es + '%22%2C%20%22mp%22%3A%220%22%2C%20%22pc%22%3A%22' + pc + '%22%2C%20%22pf%22%3A%22N%22%2C%20%22pr%22%3A%22' + price + '%22%2C%20%22pt%22%3A%22' + pt + '%22%2C%20%22qt%22%3A%22' + quanrmndr + '%22%2C%20%22rt%22%3A%22' + rt + '%22%2C%20%22tp%22%3A%22' + tp + '%22%2C%20%22ts%22%3A%22' + ts + '%22%2C%20%22tt%22%3A%22' + tt + '%22%7D'
+
+            threads = []
+            ct = datetime.datetime.now()
+            print("current time:-", ct)
+            for _ in range(ordernum):
+                t = threading.Thread(target=self.orderplace, args=(pay,))
+                threads.append(t)
+                t.start()
+            if rmndr > 0:
+                self.orderplace(payrmndr)
+                ordernum = ordernum + 1
+            for t in threads:
+                t.join()
+            # self.marginthruthread()
+        except Exception as e:
+            print("The error occured while selling orders", e)
+
+    def modify(self):
+
+        lenslorder = len(self.slorderidlist)
+        p = self.doubleSpinBox.value()
+        pstr = str(p)
+        slmodifythreads = []
+        ct = datetime.datetime.now()
+        print("current time:-", ct)
+        
+        loop = asyncio.get_event_loop()
+        tasks = [self.slmodify(str(p - 0.2),pstr,x) for x in range(lenslorder)]
+        response = loop.run_until_complete(asyncio.gather(*tasks))
+        print(response)
+        '''for x in range(lenslorder):
+            t = threading.Thread(target=self.slmodify, args=(str(p - 0.2),pstr,x))
+            slmodifythreads.append(t)
+            t.start()
+        for t in slmodifythreads:
+                t.join()'''
+
+    def modify5(self):
+
+        lenslorder = len(self.slorderidlist)
+        p = self.doubleSpinBox.value() + 0.5
+        pstr = str(p)
+        ct = datetime.datetime.now()
+        print("current time:-", ct)
+        
+        loop = asyncio.get_event_loop()
+        tasks = [self.slmodify(str(p - 0.2),pstr,x) for x in range(lenslorder)]
+        response = loop.run_until_complete(asyncio.gather(*tasks))
+        print(response)
+        
+        '''for x in range(lenslorder):
+            t = threading.Thread(target=self.slmodify, args=(str(p - 0.2),pstr,x))
+            slmodifythreads.append(t)
+            t.start()
+        for t in slmodifythreads:
+                t.join()'''
+        
+        
+        self.doubleSpinBox.setValue(p)
+
+    def modify2(self):
+        lenslorder = len(self.slorderidlist)
+        p = self.doubleSpinBox.value() + 0.2
+        pstr = str(p)
+        ct = datetime.datetime.now()
+        print("current time:-", ct)
+        loop = asyncio.get_event_loop()
+        tasks = [self.slmodify(str(p - 0.2),pstr,x) for x in range(lenslorder)]
+        response = loop.run_until_complete(asyncio.gather(*tasks))
+        print(response)
+        
+        '''for x in range(lenslorder):
+            t = threading.Thread(target=self.slmodify, args=(str(p - 0.2),pstr,x))
+            slmodifythreads.append(t)
+            t.start()
+        for t in slmodifythreads:
+                t.join()'''
+        self.doubleSpinBox.setValue(p)
+
+    def modify1(self):
+
+        lenslorder = len(self.slorderidlist)
+        p = self.doubleSpinBox.value() + 0.1
+        pstr = str(p)
+        ct = datetime.datetime.now()
+        print("current time:-", ct)
+        loop = asyncio.get_event_loop()
+        tasks = [self.slmodify(str(p - 0.2),pstr,x) for x in range(lenslorder)]
+        response = loop.run_until_complete(asyncio.gather(*tasks))
+        print(response)
+        '''
+        for x in range(lenslorder):
+            t = threading.Thread(target=self.slmodify, args=(str(p - 0.2),pstr,x))
+            slmodifythreads.append(t)
+            t.start()
+        for t in slmodifythreads:
+                t.join()'''
+        self.doubleSpinBox.setValue(p)
+
+    def modify100(self):
+        lenslorder = len(self.slorderidlist)
+        p = self.doubleSpinBox.value() + 1
+        pstr = str(p)
+        ct = datetime.datetime.now()
+        print("current time:-", ct)
+        loop = asyncio.get_event_loop()
+        tasks = [self.slmodify(str(p - 0.2),pstr,x) for x in range(lenslorder)]
+        loop.run_until_complete(asyncio.gather(*tasks))
+        
+        
+        '''for x in range(lenslorder):
+            t = threading.Thread(target=self.slmodify, args=(str(p - 0.2),pstr,x))
+            slmodifythreads.append(t)
+            t.start()
+        for t in slmodifythreads:
+                t.join()'''
+        self.doubleSpinBox.setValue(p)
+
+    def modifytrail(self):
+        lenslorder = len(self.slorderidlist)
+        p = self.doubleSpinBox.value()
+        pstr = str(p)
+        '''for x in range(0, lenslorder):
+            kite.modify_order(variety=kite.VARIETY_REGULAR, order_id=self.slorderidlist[x], trigger_price=pstr,
+                              price=p - 1)'''
+
+    def marg(self):
+        try:
+            conn = http.client.HTTPSConnection("gw-napi.kotaksecurities.com")
+            payload = 'jData=%7B%22seg%22%3A%22ALL%22%2C%22exch%22%3A%22ALL%22%2C%22prod%22%3A%22ALL%22%7D'
+            headers = {
+                'accept': 'application/json',
+                'Sid': sid,
+                'Auth': tok1,
+                'neo-fin-key': 'neotradeapi',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': accesstoken
+            }
+            conn.request("POST", "/Orders/2.0/quick/user/limits?sId=server5", payload, headers)
+            res = conn.getresponse()
+            response = res.read()
+            decoded = response.decode("utf-8")
+            data = ast.literal_eval(decoded)
+            # print(repr(data["Net"]))
+            self.avlbal.setValue(int(float(data["Net"])))
+        except Exception as e:
+            print("The error occured while selling orders", e)
+
+
+class frstwindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.resize(300, 150)
+        self.setWindowTitle("Kotak NEO Client by Ram")
+        self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint)
+        buttonlogin = QPushButton("Login as Ramprabhu", self)
+        buttonlogin.clicked.connect(self.login)
+        buttonlogin.move(95, 92)
+        buttonzgentok = QPushButton("Generate OTP", self)
+        buttonzgentok.clicked.connect(self.zgentoken)
+        buttonzgentok.move(95, 12)
+        self.zrestok = QtWidgets.QLineEdit(self)
+        self.zrestok.setGeometry(QtCore.QRect(95, 52, 150, 30))
+
+    def login(self):
+        global tok1
+        otp = self.zrestok.text()
+        print("OTP is ", otp)
+
+        conn = http.client.HTTPSConnection("gw-napi.kotaksecurities.com")
+        '''otpinput= input('Please enter the OTP \n')
+        print("The entered otp is : ",otpinput)
+        dqotp= '"%s"' % otpinput
+        print("The quoted OTP is ",dqotp)'''
+        payload = json.dumps({
+            "userId": sub,
+            "otp": otp
+        })
+        # print(payload)
+        headers = {
+            'accept': '*/*',
+            'sid': sid,
+            'Auth': tok,
+            'Content-Type': 'application/json',
+            'Authorization': accesstoken}
+        # print(headers)
+        conn.request("POST", "/login/1.0/login/v2/validate", payload, headers)
+        res = conn.getresponse()
+        data = res.read()
+        print(data.decode("utf-8"))
+        datajson1 = json.loads(data.decode("utf-8"))
+        print(datajson1)
+        tok1 = datajson1["data"]["token"]
+
+        self.close()
+        self.win = AnotherWindow()
+        self.win.show()
+
+    def zgentokenthread(self):
+        global sub, tok, accesstoken, sid
+
+        conn = http.client.HTTPSConnection('napi.kotaksecurities.com', context=ssl._create_unverified_context())
+        headers = {
+            'Authorization': 'Basic ****',
+            'Content-Type': 'application/x-www-form-urlencoded', }
+        conn.request('POST', '/oauth2/token', 'grant_type=password&username=****&password=****', headers)
+        response = conn.getresponse()
+        data = response.read()
+
+        datajson = json.loads(data.decode("utf-8"))
+        acktok = datajson["access_token"]
+        accesstoken = 'Bearer ' + acktok
+        conn = http.client.HTTPSConnection("gw-napi.kotaksecurities.com")
+        headers = {'accept': '*/*', 'Content-Type': 'application/json', 'Authorization': accesstoken}
+        payload = json.dumps({"pan": "*****", "password": "******"})
+        conn.request("POST", "/login/1.0/login/v2/validate", payload, headers)
+        res = conn.getresponse()
+        data = res.read()
+        datajson = json.loads(data.decode("utf-8"))
+        tok = datajson["data"]["token"]
+        sid = datajson["data"]["sid"]
+        sidsingquote = "'" + sid + "'"
+        splitedtoken = tok.split('.')
+        paylod = splitedtoken[1] + "=="
+        convertbytes = paylod.encode("ascii")
+        # converting into bytes from base64 system
+        convertedbytes = base64.b64decode(convertbytes)
+        # decoding the ASCII characters into alphabets
+        decodedsample = convertedbytes.decode("ascii")
+        # displaying the result
+        subjson = json.loads(decodedsample)
+        sub = subjson["sub"]
+        dqsub = '"%s"' % sub
+        conn = http.client.HTTPSConnection("gw-napi.kotaksecurities.com")
+        payload = json.dumps({"userId": sub, "sendEmail": True, "isWhitelisted": True})
+        headers = {'accept': '*/*', 'Content-Type': 'application/json', 'Authorization': accesstoken}
+        conn.request("POST", "/login/1.0/login/otp/generate", payload, headers)
+        res = conn.getresponse()
+        data = res.read()
+        print(data.decode("utf-8"))
+
+    def zgentoken(self):
+        t = threading.Thread(target=self.zgentokenthread)
+        t.start()
+
+
+app = QApplication(sys.argv)
+window = frstwindow()
+window.show()
+sys.exit(app.exec())
